@@ -21,10 +21,11 @@ class SummaryEngine:
         if self.api_key:
             openai.api_key = self.api_key
             self.use_ai = True
-            print("✅ Using OpenAI API for intelligent summaries")
+            # Avoid non-ASCII characters here; Windows consoles can default to cp1252.
+            print("[OK] Using OpenAI API for intelligent summaries")
         else:
             self.use_ai = False
-            print("ℹ️ Using local summarizer (add OPENAI_API_KEY to .env for AI)")
+            print("[INFO] Using local summarizer (add OPENAI_API_KEY to .env for AI)")
     
     def generate_summary(self, text: str, style: str = "detailed") -> Dict:
         """Generate summary - automatically detects content type"""
@@ -157,15 +158,33 @@ Keep it clear and useful."""
     def _summarize_story(self, sentences: List[str], full_text: str) -> Dict:
         """Create a flowing story summary"""
         
-        if len(sentences) <= 2:
-            summary = ' '.join(sentences)
-        else:
-            # Create a narrative flow
-            intro = sentences[0]
-            middle = ' '.join(sentences[1:-1])
-            conclusion = sentences[-1]
-            
-            summary = f"{intro} Then, {middle.lower()} Finally, {conclusion.lower()}"
+        # Keep story summaries short (2-3 sentences). The previous implementation
+        # effectively reprinted the whole story, which made "summary" == transcript.
+        summary_sents: List[str] = []
+
+        if sentences:
+            summary_sents.append(sentences[0])
+
+        # Pick one "turning point" sentence if available.
+        salient_markers = ['found', 'realized', 'discovered', 'noticed', 'remembered', 'forgot', 'lost']
+        turning_point = next(
+            (s for s in sentences[1:-1] if any(m in s.lower() for m in salient_markers)),
+            None,
+        )
+        if turning_point and turning_point not in summary_sents:
+            summary_sents.append(turning_point)
+
+        # Close with the last sentence if it adds information.
+        if len(sentences) > 1 and sentences[-1] not in summary_sents:
+            summary_sents.append(sentences[-1])
+
+        # Ensure at least 2 sentences if possible.
+        if len(summary_sents) < 2 and len(sentences) > 1:
+            summary_sents.append(sentences[1])
+
+        summary = '. '.join(s.rstrip('.').strip() for s in summary_sents[:3] if s.strip()).strip()
+        if summary and not summary.endswith('.'):
+            summary += '.'
         
         # Key moments are the main events
         key_points = []

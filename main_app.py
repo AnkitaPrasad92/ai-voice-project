@@ -60,6 +60,39 @@ with st.sidebar:
         index=1
     )
     
+    # Multilingual transcription controls (Whisper supports many languages).
+    _lang_options = [
+        ("Auto-detect", None),
+        ("English", "en"),
+        ("Hindi", "hi"),
+        ("Marathi", "mr"),
+        ("Bengali", "bn"),
+        ("Gujarati", "gu"),
+        ("Kannada", "kn"),
+        ("Malayalam", "ml"),
+        ("Punjabi", "pa"),
+        ("Tamil", "ta"),
+        ("Telugu", "te"),
+        ("Urdu", "ur"),
+        ("Spanish", "es"),
+        ("French", "fr"),
+        ("German", "de"),
+        ("Japanese", "ja"),
+        ("Korean", "ko"),
+        ("Chinese", "zh"),
+        ("Arabic", "ar"),
+        ("Russian", "ru"),
+    ]
+    _lang_label = st.selectbox("Transcription language", [x[0] for x in _lang_options], index=0)
+    transcribe_lang = dict(_lang_options).get(_lang_label)
+    
+    _task_options = [
+        ("Transcribe (original language)", "transcribe"),
+        ("Translate to English", "translate"),
+    ]
+    _task_label = st.selectbox("Task", [x[0] for x in _task_options], index=0)
+    transcribe_task = dict(_task_options).get(_task_label, "transcribe")
+    
     if st.button("🚀 Load Model", type="primary"):
         with st.spinner(f"Loading {model_size} model..."):
             st.session_state.transcriber = TranscriptionEngine(model_size)
@@ -121,9 +154,15 @@ with tab1:
                     try:
                         # Check if file exists
                         if os.path.exists(st.session_state.recorded_file):
-                            result = st.session_state.transcriber.transcribe_file(st.session_state.recorded_file)
+                            result = st.session_state.transcriber.transcribe_file(
+                                st.session_state.recorded_file,
+                                language=transcribe_lang,
+                                task=transcribe_task,
+                            )
                             st.session_state.transcription = result['text']
                             st.success("✅ Transcription complete!")
+                            if result.get("language"):
+                                st.caption(f"Detected language: {result.get('language')}")
                             
                             # Show preview
                             with st.expander("View transcription preview"):
@@ -151,9 +190,15 @@ with tab2:
             if st.session_state.transcriber:
                 with st.spinner("🔄 Transcribing uploaded file..."):
                     try:
-                        result = st.session_state.transcriber.transcribe_uploaded(uploaded_file)
+                        result = st.session_state.transcriber.transcribe_uploaded(
+                            uploaded_file,
+                            language=transcribe_lang,
+                            task=transcribe_task,
+                        )
                         st.session_state.transcription = result['text']
                         st.success("✅ Transcription complete!")
+                        if result.get("language"):
+                            st.caption(f"Detected language: {result.get('language')}")
                     except Exception as e:
                         st.error(f"❌ Transcription failed: {e}")
             else:
@@ -218,6 +263,7 @@ with tab3:
                 <div style="
                     padding: 15px;
                     background-color: #f0f2f6;
+                    color: #0f172a;
                     border-radius: 10px;
                     border-left: 4px solid #1E3A8A;
                     font-size: 16px;
